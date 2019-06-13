@@ -5,6 +5,6 @@ set DEFINES="/D_CRT_SECURE_NO_WARNINGS"
 
 pushd bin
 echo Compiling:
-cl /nologo /diagnostics:caret /Zi /Wall /WX %WARN_DISABLE% %DEFINES% ..\nojang.c
+cl /nologo /diagnostics:caret /Zi %WARN_DISABLE% %DEFINES% WS2_32.lib ..\nojang.c
 popd
 
