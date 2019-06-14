@@ -89,7 +89,28 @@ void printLegacyPayloadV0(u16 *payload, u16 payloadLen) {
 }
 
 void printLegacyPayloadV1(u16 *payload, u16 payloadLen) {
+    // TODO: Check that offsetToNextString doesn't run past the end of payload
     
+    i32 offsetToNextString = 3; // Skip v1 magic string and null terminator
+    u16 *currentString = payload + offsetToNextString;
+    
+    wprintf(L"Protocol version: %s\n", currentString);
+    offsetToNextString += wcslen(currentString) + 1; // Account for null terminator
+    currentString = payload + offsetToNextString;
+    
+    wprintf(L"Server Version: %s\n", currentString);
+    offsetToNextString += wcslen(currentString) + 1;
+    currentString = payload + offsetToNextString;
+    
+    wprintf(L"MOTD: %s\n", currentString);
+    offsetToNextString += wcslen(currentString) + 1;
+    currentString = payload + offsetToNextString;
+    
+    wprintf(L"Online: %s\n", currentString);
+    offsetToNextString += wcslen(currentString) + 1;
+    currentString = payload + offsetToNextString;
+    
+    wprintf(L"Max Players: %s\n", currentString);
 }
 
 i32 main(int argc, char **argv) {
@@ -102,15 +123,13 @@ i32 main(int argc, char **argv) {
     
     connectionSocket = INVALID_SOCKET;
     
-    printf("Goodbye Notch\n");
+    //printf("Goodbye Notch\n");
     
     lastError = WSAStartup(MAKEWORD(2, 2), &wsaData); // Request version 2.2
     if(lastError) {
         printf("Winsoc failed to start, error: %d\n", lastError);
         return 1;
     }
-    
-    printf("Winsoc version %u.%u\n", LOBYTE(wsaData.wVersion), HIBYTE(wsaData.wVersion));
     
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -174,8 +193,6 @@ i32 main(int argc, char **argv) {
     else {
         printLegacyPayloadV0(payloadBuffer, payloadStrLen);
     }
-    
-    DebugBreak();
     
     free(payloadBuffer);
     
