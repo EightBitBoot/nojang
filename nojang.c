@@ -26,6 +26,30 @@ i32 readVarInt(SOCKET socket) {
     return result;
 }
 
+void swapWcharStrEndianness(u16 *string) {
+    int index = 0;
+    
+    while(string[index] != 0x00) {
+        u16 newValue = 0;
+        newValue |= (string[index] & 0xFF00) >> 8;
+        newValue |= (string[index] & 0x00FF) << 8;
+        
+        string[index] = newValue;
+        
+        index++;
+    }
+}
+
+void swapWcharStrEndiannessLen(u16 *string, i32 length) {
+    for(int index = 0; index < length; index++) {
+        u16 newValue = 0;
+        newValue |= (string[index] & 0xFF00) >> 8;
+        newValue |= (string[index] & 0x00FF) << 8;
+        
+        string[index] = newValue;
+    }
+}
+
 i32 main(int argc, char **argv) {
     byte outgoingHandshake[19] = {0x12, 0x10, 0xFF, 0xFF, 0xFF, 0x0F, 0x6C, 0x6F, 0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x00, 0x63, 0xDD, 0x01};
     byte requestPacket[2] = {0x01, 0x00};
@@ -117,7 +141,9 @@ i32 main(int argc, char **argv) {
     recv(connectionSocket, responseBuffer, responseLength, 0);
          */
     
-    // Send legacy ping
+    
+#if 0
+    // Send oldest legacy ping
     byte legacyPing = 0xFE;
     lastError = send(connectionSocket, &legacyPing, 1, 0);
     if (lastError == SOCKET_ERROR) {
@@ -140,18 +166,44 @@ i32 main(int argc, char **argv) {
     memset(resultPayloadBuffer, 0, resultPayloadSize);
     recv(connectionSocket, (byte *) resultPayloadBuffer, resultPayloadSize - 2, 0); // (resultPayloadSize - 2): don't overwrite the null terminator
     
-    // Swap endianness of every character
-    for(int i = 0; i < resultPayloadSize / 2; i++) {
-        u16 newValue = 0;
-        newValue |= (resultPayloadBuffer[i] & 0xFF00) >> 8;
-        newValue |= (resultPayloadBuffer[i] & 0x00FF) << 8;
-        
-        resultPayloadBuffer[i] = newValue;
-    }
+    swapWcharStrEndianness(resultPayloadBuffer);
+    
+    wprintf(L"%s\n", resultPayloadBuffer);
     
     DebugBreak();
     
     free(resultPayloadBuffer);
+#else
+    
+    byte legacyPing[2] = {0xFE, 01};
+    lastError = send(connectionSocket, legacyPing, 2, 0);
+    if (lastError == SOCKET_ERROR) {
+        printf("send failed with error: %d\n", WSAGetLastError());
+        closesocket(connectionSocket);
+        WSACleanup();
+        return 1;
+    }
+    
+    //Get result
+    byte resultHeader[3] = {0};
+    recv(connectionSocket, resultHeader, 3, 0);
+    u16 resultPayloadSize = 0;
+    resultPayloadSize |= resultHeader[2];
+    resultPayloadSize |= (resultHeader[1] << 8);
+    resultPayloadSize++; // Account for null terminator
+    resultPayloadSize *= sizeof(u16); // Account for two byte wide characters
+    
+    u16 *resultPayloadBuffer = (u16 *) malloc(resultPayloadSize);
+    memset(resultPayloadBuffer, 0, resultPayloadSize);
+    recv(connectionSocket, (byte *) resultPayloadBuffer, resultPayloadSize - 2, 0); // (resultPayloadSize - 2): don't overwrite the null terminator
+    
+    swapWcharStrEndiannessLen(resultPayloadBuffer, (resultPayloadSize / 2));
+    
+    DebugBreak();
+    
+    free(resultPayloadBuffer);
+    
+#endif
     
     shutdown(connectionSocket, SD_SEND);
     closesocket(connectionSocket);
