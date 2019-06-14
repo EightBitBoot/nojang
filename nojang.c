@@ -74,6 +74,24 @@ u16 getLegacyPayloadStrlen() {
     return result;
 }
 
+void printLegacyPayloadV0(u16 *payload, u16 payloadLen) {
+    u16 *currentStr = NULL;
+    u16 *wcstrtokContext = NULL;
+    
+    currentStr = wcstok_s(payload, L"§", &wcstrtokContext);
+    wprintf(L"MOTD: %s\n", currentStr);
+    
+    currentStr = wcstok_s(NULL, L"§", &wcstrtokContext);
+    wprintf(L"Online: %s\n", currentStr);
+    
+    currentStr = wcstok_s(NULL, L"§", &wcstrtokContext);
+    wprintf(L"Max Players: %s\n", currentStr);
+}
+
+void printLegacyPayloadV1(u16 *payload, u16 payloadLen) {
+    
+}
+
 i32 main(int argc, char **argv) {
     i32 lastError = 0;
     WSADATA wsaData = {0};
@@ -134,22 +152,32 @@ i32 main(int argc, char **argv) {
         return 1;
     }
     
+    // Send request
     sendLegacyRequest();
     
     //Get result
     u16 payloadStrLen = getLegacyPayloadStrlen();
     payloadStrLen++; // Add room for a null terminator
     u32 payloadBufferSize = payloadStrLen * sizeof(u16); // Make each character 2 bytes
-    u16 *resultPayloadBuffer = (u16 *) malloc(payloadBufferSize);
-    memset(resultPayloadBuffer, 0, payloadBufferSize);
+    u16 *payloadBuffer = (u16 *) malloc(payloadBufferSize);
+    memset(payloadBuffer, 0, payloadBufferSize);
     
-    getRawResponse((byte *) resultPayloadBuffer, payloadBufferSize);
+    getRawResponse((byte *) payloadBuffer, payloadBufferSize);
     
-    swapWcharStrEndiannessLen(resultPayloadBuffer, payloadBufferSize / 2);
+    swapWcharStrEndiannessLen(payloadBuffer, payloadBufferSize / 2);
+    
+    //Print
+    // Magic characters for protocol v1
+    if(payloadBuffer[0] == 167 && payloadBuffer[1] == 49) {
+        printLegacyPayloadV1(payloadBuffer, payloadStrLen);
+    }
+    else {
+        printLegacyPayloadV0(payloadBuffer, payloadStrLen);
+    }
     
     DebugBreak();
     
-    free(resultPayloadBuffer);
+    free(payloadBuffer);
     
     shutdown(connectionSocket, SD_SEND);
     closesocket(connectionSocket);
