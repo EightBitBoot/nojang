@@ -97,6 +97,9 @@ i32 main(int argc, char **argv) {
     i32 lastError = 0;
     WSADATA wsaData = {0};
     
+    char *hostname = NULL;
+    char *hostport = NULL;
+    
     struct addrinfo hints = {0};
     struct addrinfo *result = NULL;
     struct addrinfo *ptr = NULL;
@@ -105,7 +108,41 @@ i32 main(int argc, char **argv) {
     
     //printf("Goodbye Notch\n");
     
-    lastError = WSAStartup(MAKEWORD(2, 2), &wsaData); // Request version 2.2
+    if(argc < 2) {
+        printf("Usage: nojang <server-ip>\n");
+        return 1;
+    }
+    
+    // Test if user supplied a port
+    if(strchr(argv[1], ':') != NULL) {
+        char *currentToken = NULL;
+        i32 hostSize = 0;
+        i32 portSize = 0;
+        
+        currentToken = strtok(argv[1], ":");
+        hostSize = strlen(currentToken) + 1;
+        hostname = malloc(hostSize);
+        memset(hostname, 0, hostSize);
+        strcpy(hostname, currentToken);
+        
+        currentToken = strtok(NULL, ":");
+        portSize = strlen(currentToken) + 1;
+        hostport = malloc(portSize);
+        memset(hostport, 0, portSize);
+        strcpy(hostport, currentToken);
+    }
+    else {
+        // No port supplied hostname is just parameter; port is default
+        hostname = malloc(strlen(argv[1]) + 1);
+        memset(hostname, 0, strlen(argv[1]) + 1);
+        strcpy(hostname, argv[1]);
+        
+        hostport = malloc(6); // strlen("25565") + null terminator
+        memset(hostport, 0, strlen(argv[1]) + 1);
+        strcpy(hostport, "25565");
+    }
+    
+    lastError = WSAStartup(MAKEWORD(2, 2), &wsaData); // Request winsock version 2.2
     if(lastError) {
         printf("Winsoc failed to start, error: %d\n", lastError);
         return 1;
@@ -115,9 +152,17 @@ i32 main(int argc, char **argv) {
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     
-    lastError = getaddrinfo("localhost", "25565", &hints, &result);
+    lastError = getaddrinfo(hostname, hostport, &hints, &result);
+    free(hostname);
+    free(hostport);
     if(lastError) {
-        printf("Getaddrinfo failed, error: %d\n", lastError);
+        if(lastError == WSAHOST_NOT_FOUND) {
+            printf("Unable to connect to server \"%s\"\n", argv[1]);
+        }
+        else {
+            printf("Getaddrinfo failed, error: %d\n", lastError);
+        }
+        
         WSACleanup();
         return 1;
     }
@@ -136,6 +181,7 @@ i32 main(int argc, char **argv) {
         // Connect to server.
         lastError = connect( connectionSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
         if (lastError == SOCKET_ERROR) {
+            printf("Connect failed with error: %ld\n", WSAGetLastError());
             closesocket(connectionSocket);
             connectionSocket = INVALID_SOCKET;
             continue;
@@ -146,7 +192,7 @@ i32 main(int argc, char **argv) {
     freeaddrinfo(result);
     
     if (connectionSocket == INVALID_SOCKET) {
-        printf("Unable to connect to server!\n");
+        printf("Unable to connect to server \"%s\"\n", argv[1]);
         WSACleanup();
         return 1;
     }
