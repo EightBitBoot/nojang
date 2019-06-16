@@ -9,26 +9,6 @@
 
 SOCKET connectionSocket;
 
-i32 readVarInt(SOCKET socket) {
-    i32 bytesRead = 0;
-    i32 result = 0;
-    byte read = 0;
-    
-    do {
-        recv(socket, &read, 1, 0);
-        int value = (read & 0b01111111);
-        result |= (value << (7 * bytesRead));
-        
-        bytesRead++;
-        if(bytesRead > 5) {
-            printf("VarInt too big!\n");
-        }
-    }
-    while(read & 0b10000000);
-    
-    return result;
-}
-
 bool sendLegacyRequest() {
     byte legacyPingPacket[2] = {0xFE, 01};
     int lastError = 0;
